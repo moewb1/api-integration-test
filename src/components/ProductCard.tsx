@@ -13,7 +13,7 @@ import { formatPrice, formatRating } from '../utils/format';
 
 type ProductCardProps = {
   product: Product;
-  onPress?: () => void;
+  onPress?: (product: Product) => void;
   isDragging?: boolean;
 };
 
@@ -22,11 +22,15 @@ export function ProductCard({
   onPress,
   isDragging = false,
 }: ProductCardProps) {
+  function handlePress() {
+    onPress?.(product);
+  }
+
   return (
     <Pressable
       accessibilityRole="button"
       disabled={!onPress}
-      onPress={onPress}
+      onPress={onPress ? handlePress : undefined}
       style={({pressed}) => [
         styles.card,
         pressed && !isDragging && styles.cardPressed,

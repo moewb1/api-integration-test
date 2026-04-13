@@ -173,6 +173,75 @@ export function ProductCatalogScreen() {
     await persistProductOrder(nextProducts);
   }
 
+  function handleRetryPress() {
+    hydrateProducts().catch(() => undefined);
+  }
+
+  function handleProductPress(product: Product) {
+    if (Date.now() - lastDragReleaseAt.current < 250) {
+      return;
+    }
+
+    if (dragSessionRef.current) {
+      return;
+    }
+
+    setSelectedProduct(product);
+  }
+
+  function handleProductDetailsClose() {
+    setSelectedProduct(null);
+  }
+
+  function renderProductRow(item: Product, index: number) {
+    const handleResponder = buildHandleResponder(item, index);
+    const isDraggedItem = dragState?.product.id === item.id;
+
+    let rowContent: React.ReactNode = (
+      <ProductCard
+        onPress={handleProductPress}
+        product={item}
+      />
+    );
+
+    if (isDraggedItem) {
+      rowContent = (
+        <View style={[styles.placeholder, styles.sourcePlaceholder]} />
+      );
+    }
+
+    return (
+      <View
+        key={item.id}
+        collapsable={false}
+        style={styles.row}
+        {...handleResponder.panHandlers}>
+        {rowContent}
+      </View>
+    );
+  }
+
+  function renderDragOverlay() {
+    if (!dragState) {
+      return null;
+    }
+
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.dragOverlay,
+          {
+            transform: [{translateY: dragTop}],
+          },
+        ]}>
+        <View style={styles.row}>
+          <ProductCard isDragging product={dragState.product} />
+        </View>
+      </Animated.View>
+    );
+  }
+
   function buildHandleResponder(product: Product, index: number) {
     const shouldCaptureMove = (
       dx: number,
@@ -223,11 +292,7 @@ export function ProductCatalogScreen() {
         <Text style={styles.stateText}>
           {errorMessage ?? 'The API responded with an empty list.'}
         </Text>
-        <Pressable
-          onPress={() => {
-            hydrateProducts().catch(() => undefined);
-          }}
-          style={styles.retryButton}>
+        <Pressable onPress={handleRetryPress} style={styles.retryButton}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </Pressable>
       </View>
@@ -243,54 +308,10 @@ export function ProductCatalogScreen() {
           }}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}>
-          {products.map(item => {
-            const actualIndex = products.findIndex(
-              product => product.id === item.id,
-            );
-            const handleResponder = buildHandleResponder(item, actualIndex);
-            const isDraggedItem = dragState?.product.id === item.id;
-
-            return (
-              <View
-                key={item.id}
-                collapsable={false}
-                style={styles.row}
-                {...handleResponder.panHandlers}>
-                {isDraggedItem ? (
-                  <View style={[styles.placeholder, styles.sourcePlaceholder]} />
-                ) : (
-                  <ProductCard
-                    onPress={() => {
-                      if (Date.now() - lastDragReleaseAt.current < 250) {
-                        return;
-                      }
-
-                      if (!dragSessionRef.current) {
-                        setSelectedProduct(item);
-                      }
-                    }}
-                    product={item}
-                  />
-                )}
-              </View>
-            );
-          })}
+          {products.map(renderProductRow)}
         </ScrollView>
 
-        {dragState ? (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.dragOverlay,
-              {
-                transform: [{translateY: dragTop}],
-              },
-            ]}>
-            <View style={styles.row}>
-              <ProductCard isDragging product={dragState.product} />
-            </View>
-          </Animated.View>
-        ) : null}
+        {renderDragOverlay()}
       </>
     );
   }
@@ -318,9 +339,7 @@ export function ProductCatalogScreen() {
       </View>
 
       <ProductDetailsModal
-        onClose={() => {
-          setSelectedProduct(null);
-        }}
+        onClose={handleProductDetailsClose}
         product={selectedProduct}
       />
     </SafeAreaView>
