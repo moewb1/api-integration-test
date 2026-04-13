@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ProductCard } from '../components/ProductCard';
+// Dynamic paths
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import {
   AUTO_SCROLL_EDGE,
@@ -201,6 +202,99 @@ export function ProductCatalogScreen() {
     });
   }
 
+  let content: React.ReactNode;
+
+  if (isLoading) {
+    content = (
+      <View style={styles.centerState}>
+        <ActivityIndicator color="#1f2d1d" size="large" />
+        <Text style={styles.stateTitle}>Loading products</Text>
+        <Text style={styles.stateText}>
+          Pulling the latest catalog from the API.
+        </Text>
+      </View>
+    );
+  } else if (products.length === 0) {
+    content = (
+      <View style={styles.centerState}>
+        <Text style={styles.stateTitle}>
+          {errorMessage ? 'Unable to load products' : 'No products found'}
+        </Text>
+        <Text style={styles.stateText}>
+          {errorMessage ?? 'The API responded with an empty list.'}
+        </Text>
+        <Pressable
+          onPress={() => {
+            hydrateProducts().catch(() => undefined);
+          }}
+          style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  } else {
+    content = (
+      <>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.listContent}
+          onScroll={event => {
+            scrollOffset.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}>
+          {products.map(item => {
+            const actualIndex = products.findIndex(
+              product => product.id === item.id,
+            );
+            const handleResponder = buildHandleResponder(item, actualIndex);
+            const isDraggedItem = dragState?.product.id === item.id;
+
+            return (
+              <View
+                key={item.id}
+                collapsable={false}
+                style={styles.row}
+                {...handleResponder.panHandlers}>
+                {isDraggedItem ? (
+                  <View style={[styles.placeholder, styles.sourcePlaceholder]} />
+                ) : (
+                  <ProductCard
+                    onPress={() => {
+                      if (Date.now() - lastDragReleaseAt.current < 250) {
+                        return;
+                      }
+
+                      if (!dragSessionRef.current) {
+                        setSelectedProduct(item);
+                      }
+                    }}
+                    product={item}
+                  />
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        {dragState ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.dragOverlay,
+              {
+                transform: [{translateY: dragTop}],
+              },
+            ]}>
+            <View style={styles.row}>
+              <ProductCard isDragging product={dragState.product} />
+            </View>
+          </Animated.View>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
       <View style={styles.screen}>
@@ -219,90 +313,7 @@ export function ProductCatalogScreen() {
             setListHeight(event.nativeEvent.layout.height);
           }}
           style={styles.listShell}>
-          {isLoading ? (
-            <View style={styles.centerState}>
-              <ActivityIndicator color="#1f2d1d" size="large" />
-              <Text style={styles.stateTitle}>Loading products</Text>
-              <Text style={styles.stateText}>
-                Pulling the latest catalog from the API.
-              </Text>
-            </View>
-          ) : products.length === 0 ? (
-            <View style={styles.centerState}>
-              <Text style={styles.stateTitle}>
-                {errorMessage ? 'Unable to load products' : 'No products found'}
-              </Text>
-              <Text style={styles.stateText}>
-                {errorMessage ?? 'The API responded with an empty list.'}
-              </Text>
-              <Pressable
-                onPress={() => {
-                  hydrateProducts().catch(() => undefined);
-                }}
-                style={styles.retryButton}>
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <>
-              <ScrollView
-                ref={scrollViewRef}
-                contentContainerStyle={styles.listContent}
-                onScroll={event => {
-                  scrollOffset.current = event.nativeEvent.contentOffset.y;
-                }}
-                scrollEventThrottle={16}
-                showsVerticalScrollIndicator={false}>
-                {products.map(item => {
-                  const actualIndex = products.findIndex(
-                    product => product.id === item.id,
-                  );
-                  const handleResponder = buildHandleResponder(item, actualIndex);
-                  const isDraggedItem = dragState?.product.id === item.id;
-
-                  return (
-                    <View
-                      key={item.id}
-                      collapsable={false}
-                      style={styles.row}
-                      {...handleResponder.panHandlers}>
-                      {isDraggedItem ? (
-                        <View style={[styles.placeholder, styles.sourcePlaceholder]} />
-                      ) : (
-                        <ProductCard
-                          onPress={() => {
-                            if (Date.now() - lastDragReleaseAt.current < 250) {
-                              return;
-                            }
-
-                            if (!dragSessionRef.current) {
-                              setSelectedProduct(item);
-                            }
-                          }}
-                          product={item}
-                        />
-                      )}
-                    </View>
-                  );
-                })}
-              </ScrollView>
-
-              {dragState ? (
-                <Animated.View
-                  pointerEvents="none"
-                  style={[
-                    styles.dragOverlay,
-                    {
-                      transform: [{translateY: dragTop}],
-                    },
-                  ]}>
-                  <View style={styles.row}>
-                    <ProductCard isDragging product={dragState.product} />
-                  </View>
-                </Animated.View>
-              ) : null}
-            </>
-          )}
+          {content}
         </View>
       </View>
 
